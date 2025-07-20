@@ -4,3 +4,13 @@
 
 
 Kernel SLUB memory visualization
+
+##Installation
+
+start the gdb
+
+```
+gdb ./vmlinux
+gdb> source path/to/ophthalmosMono.py
+gdb> serve_init_task
+```

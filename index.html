@@ -1,0 +1,100 @@
+<!-- Save as: process_tree.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Process Tree Viewer</title>
+  <style>
+    body { font-family: monospace; background: #222; color: #eee; }
+    .tree { margin: 2em; }
+    .node {
+      border: 1px solid #888;
+      border-radius: 8px;
+      padding: 0.5em 1em;
+      margin: 1em 0;
+      background: #333;
+      display: inline-block;
+      min-width: 200px;
+      position: relative;
+    }
+    .children {
+      margin-left: 3em;
+      border-left: 2px dashed #555;
+      padding-left: 2em;
+    }
+    .pid { color: #8cf; }
+    .comm { color: #fc8; }
+    .state { color: #8f8; }
+    .label { color: #aaa; }
+  </style>
+</head>
+<body>
+  <h2>Process Tree</h2>
+  <div id="tree" class="tree"></div>
+  <script>
+    // Example fetch, replace URL if needed
+    async function fetchInitTask() {
+      const resp = await fetch('http://localhost:8000/');
+      return await resp.json();
+    }
+
+    // Dummy data for demonstration (replace with fetchInitTask() in production)
+    const demoData = {
+      pid: 0,
+      comm: "swapper/0",
+      __state: 0,
+      saved_state: 0,
+      flags: 0,
+      prio: 0,
+      on_cpu: 0,
+      exit_state: 0,
+      children: [
+        {
+          pid: 1,
+          comm: "init",
+          __state: 1,
+          children: [
+            {
+              pid: 96,
+              comm: "udhcpc",
+              __state: 1,
+              children: [
+                { pid: 105, comm: "sumtion", __state: 0, children: [] }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+
+    // Render a node and its children recursively
+    function renderNode(node) {
+      const div = document.createElement('div');
+      div.className = 'node';
+      div.innerHTML = `
+        <span class="label">pid</span>: <span class="pid">${node.pid}</span><br>
+        <span class="label">comm</span>: <span class="comm">${node.comm}</span><br>
+        <span class="label">state</span>: <span class="state">${node.__state}</span>
+      `;
+      if (node.children && node.children.length) {
+        const childrenDiv = document.createElement('div');
+        childrenDiv.className = 'children';
+        node.children.forEach(child => {
+          childrenDiv.appendChild(renderNode(child));
+        });
+        div.appendChild(childrenDiv);
+      }
+      return div;
+    }
+
+    // Main render function
+    async function renderTree() {
+      // const data = await fetchInitTask(); // Uncomment for real data
+      const data = demoData; // Remove for real data
+      document.getElementById('tree').appendChild(renderNode(data));
+    }
+
+    renderTree();
+  </script>
+</body>
+</html>
