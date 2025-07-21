@@ -216,6 +216,14 @@ def get_slub_memory_usage():
     except Exception as e:
         return {"error": str(e), "caches": caches}
 
+def get_all_symbols():
+    """Return all symbols using 'maint print symbols'."""
+    try:
+        output = gdb.execute("maint print symbols", to_string=True)
+        return {"symbols": output}
+    except Exception as e:
+        return {"error": str(e)}
+
 class InitTaskHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/" or self.path == "/index.html":
@@ -273,6 +281,12 @@ class InitTaskHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(usage).encode())
+        elif self.path == "/all_symbols":
+            data = get_all_symbols()
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode())
         else:
             self.send_response(404)
             self.end_headers()

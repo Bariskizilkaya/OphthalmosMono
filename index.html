@@ -368,8 +368,130 @@
       }
     }
 
+    async function fetchAllSymbols() {
+      const resp = await fetch('http://localhost:8000/all_symbols');
+      return await resp.json();
+    }
+
+    function parseSymbolLines(lines) {
+      // Try to extract address and symbol name from each line
+      // Example line: '0xffffffff812b0900 some_symbol_name'
+      return lines.map(line => {
+        const match = line.match(/(0x[0-9a-fA-F]+)\s+(.+)/);
+        if (match) {
+          return { address: match[1], symbol: match[2] };
+        } else {
+          return { address: '', symbol: line };
+        }
+      });
+    }
+
+    async function renderAllSymbols() {
+      const data = await fetchAllSymbols();
+      const sidebar = document.querySelector('.sidebar');
+      let section = document.getElementById('all-symbols-section');
+      if (!section) {
+        section = document.createElement('div');
+        section.id = 'all-symbols-section';
+        sidebar.appendChild(section);
+      }
+      section.innerHTML = '<h4 style="margin-bottom:0.5em;">All Symbols</h4>';
+      if (data.error) {
+        section.innerHTML += `<span style=\"color:#f88\">Error: ${data.error}</span>`;
+        return;
+      }
+      // Search box
+      const search = document.createElement('input');
+      search.type = 'text';
+      search.placeholder = 'Filter symbols...';
+      search.style.width = '100%';
+      search.style.marginBottom = '0.5em';
+      search.style.padding = '4px 8px';
+      search.style.background = '#222';
+      search.style.color = '#8cf';
+      search.style.border = '1px solid #444';
+      search.style.borderRadius = '4px';
+      search.style.fontSize = '1em';
+      section.appendChild(search);
+      // Parse and show as table
+      const lines = data.symbols.split('\n').filter(l => l.trim().length > 0);
+      let parsed = parseSymbolLines(lines);
+      // Table container
+      const tableDiv = document.createElement('div');
+      tableDiv.style.maxHeight = '300px';
+      tableDiv.style.overflowY = 'auto';
+      tableDiv.style.background = '#181818';
+      tableDiv.style.border = '1px solid #444';
+      tableDiv.style.borderRadius = '4px';
+      tableDiv.style.padding = '0.5em 0';
+      tableDiv.style.fontSize = '0.92em';
+      tableDiv.style.marginTop = '0.2em';
+      // Table
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      // Header
+      const header = document.createElement('tr');
+      ['Address', 'Symbol'].forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        th.style.color = '#8cf';
+        th.style.background = '#222';
+        th.style.padding = '4px 8px';
+        th.style.position = 'sticky';
+        th.style.top = '0';
+        th.style.fontWeight = 'bold';
+        th.style.fontSize = '1em';
+        th.style.textAlign = h === 'Address' ? 'left' : 'left';
+        header.appendChild(th);
+      });
+      table.appendChild(header);
+      // Render rows (first 100 by default)
+      function renderRows(filter) {
+        table.querySelectorAll('tr:not(:first-child)').forEach(tr => tr.remove());
+        let filtered = parsed;
+        if (filter) {
+          const f = filter.toLowerCase();
+          filtered = parsed.filter(row => row.symbol.toLowerCase().includes(f) || row.address.toLowerCase().includes(f));
+        }
+        filtered.slice(0, 100).forEach(row => {
+          const tr = document.createElement('tr');
+          const tdAddr = document.createElement('td');
+          tdAddr.textContent = row.address;
+          tdAddr.style.color = '#fc8';
+          tdAddr.style.fontFamily = 'monospace';
+          tdAddr.style.padding = '2px 8px';
+          tdAddr.style.fontSize = '0.95em';
+          const tdSym = document.createElement('td');
+          tdSym.textContent = row.symbol;
+          tdSym.style.color = '#eee';
+          tdSym.style.padding = '2px 8px';
+          tr.appendChild(tdAddr);
+          tr.appendChild(tdSym);
+          table.appendChild(tr);
+        });
+        if (filtered.length > 100) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 2;
+          td.textContent = `... (${filtered.length - 100} more)`;
+          td.style.color = '#888';
+          td.style.textAlign = 'center';
+          tr.appendChild(td);
+          table.appendChild(tr);
+        }
+      }
+      renderRows('');
+      search.addEventListener('input', e => {
+        renderRows(search.value);
+      });
+      tableDiv.appendChild(table);
+      section.appendChild(tableDiv);
+    }
+
     // Initial tab
     showTab('process');
+    renderAllSymbols();
 
     // Live update only process info when process tab is active
     setInterval(() => {
