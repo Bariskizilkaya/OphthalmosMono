@@ -281,6 +281,7 @@
     let lastSlubCachesJson = null;
     async function renderMemoryUsage() {
       const div = document.getElementById('memory-usage');
+      div.innerHTML = '<div id="memory-loading" style="color:#8cf;padding:2em;text-align:center;">Loading memory usage...</div>';
       // Fetch and render SLUB memory info
       const slub = await fetchSlubMemory();
       const newCachesJson = JSON.stringify(slub.caches);
@@ -364,6 +365,7 @@
         memoryTab.style.display = 'block';
         tabProcess.classList.remove('active');
         tabMemory.classList.add('active');
+        lastSlubCachesJson = null; // Force re-render
         renderMemoryUsage(); // Only update when switching to the tab
       }
     }
@@ -395,11 +397,19 @@
         section.id = 'all-symbols-section';
         sidebar.appendChild(section);
       }
-      section.innerHTML = '<h4 style="margin-bottom:0.5em;">All Symbols</h4>';
+      // Loading message
+      const loading = document.createElement('div');
+      loading.textContent = 'Loading symbols...';
+      loading.style.color = '#8cf';
+      loading.style.padding = '1em 0';
+      loading.style.textAlign = 'center';
+      section.appendChild(loading);
       if (data.error) {
         section.innerHTML += `<span style=\"color:#f88\">Error: ${data.error}</span>`;
         return;
       }
+      // Remove loading
+      loading.remove();
       // Search box
       const search = document.createElement('input');
       search.type = 'text';
