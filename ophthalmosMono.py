@@ -148,23 +148,23 @@ def get_all_tasks():
         return [{"error": str(e)}]
 
 def get_slub_memory_usage():
-    """Return SLUB memory usage for all caches as a list of dicts, including total slabs and objects (advanced)."""
     caches = []
-    MAX_NUMNODES = 1024  # Typical value, may be less in your kernel
+    MAX_NUMNODES = 4  # Set to 1, 2, or 4 for most systems
     try:
         kmalloc_caches = gdb.parse_and_eval("kmalloc_caches")
         for i in range(0, 256):
             entry = kmalloc_caches.dereference()[i]
             try:
                 if int(entry) == 0:
-                    continue  # Skip null pointers
+                    continue
             except Exception:
                 continue
             try:
                 cache = entry.dereference()
                 name = str(cache['name']).strip('"').replace('\\000', '').replace('\x00', '').strip()
+                if not name:
+                    continue
                 addr = str(entry)
-                # Use available fields
                 try:
                     object_size = int(cache['object_size'])
                 except Exception:
@@ -177,7 +177,6 @@ def get_slub_memory_usage():
                     size = int(cache['size'])
                 except Exception:
                     size = None
-                # Advanced: try to sum total slabs and objects from node array
                 total_slabs = 0
                 total_objects = 0
                 try:
@@ -185,11 +184,10 @@ def get_slub_memory_usage():
                     for n in range(MAX_NUMNODES):
                         try:
                             node = node_ptr[n]
-                            # Try common field names
                             try:
                                 slabs = int(node['nr_slabs'])
                             except Exception:
-                                slabs = 0
+                                break  # Stop if node is invalid
                             try:
                                 objs = int(node['total_objects'])
                             except Exception:
@@ -197,7 +195,7 @@ def get_slub_memory_usage():
                             total_slabs += slabs
                             total_objects += objs
                         except Exception:
-                            continue
+                            break  # Stop on first invalid node
                 except Exception:
                     total_slabs = None
                     total_objects = None
