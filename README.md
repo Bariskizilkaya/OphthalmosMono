@@ -4,7 +4,6 @@
 
 
 
-
 ## Installation
 
 start the gdb
@@ -15,4 +14,5 @@ gdb> source path/to/ophthalmosMono.py
 gdb> serve_init_task
 ```
 
-<img width="793" height="724" alt="image" src="https://github.com/user-attachments/assets/28f083f1-7447-42a5-a2d3-ff88e876f380" />
+
+<img width="2465" height="1246" alt="image" src="https://github.com/user-attachments/assets/4d59b024-ecfb-43ea-bed0-2910b0b3a9ad" />
