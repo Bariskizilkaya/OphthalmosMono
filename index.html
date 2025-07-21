@@ -503,14 +503,11 @@
     showTab('process');
     renderAllSymbols();
 
-    // Live update only process info when process tab is active
-    setInterval(() => {
       if (document.getElementById('tab-content-process').style.display !== 'none') {
         renderTree();
         renderAllTasks();
         renderRegisters();
       }
-    }, 1000);
 
     // Optionally, update memory info when memory tab is active
     // setInterval(() => {
