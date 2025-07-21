@@ -9,6 +9,8 @@
 start the gdb
 
 ```
+update the path of the index.html
+                open("/home/asd/Documents/projects/opt/OphthalmosMono/index.html", "rb")
 gdb ./vmlinux
 gdb> source path/to/ophthalmosMono.py
 gdb> serve_init_task
