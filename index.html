@@ -5,8 +5,55 @@
   <meta charset="UTF-8">
   <title>Process Tree Viewer</title>
   <style>
-    body { font-family: monospace; background: #222; color: #eee; }
-    .tree { margin: 2em; }
+    body { font-family: monospace; background: #222; color: #eee; margin: 0; }
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background: #181818;
+      border-bottom: 1px solid #444;
+      display: flex;
+      align-items: center;
+      z-index: 20;
+      padding-left: 320px; /* To avoid overlapping the sidebar */
+    }
+    .tab-btn {
+      background: #222;
+      color: #8cf;
+      border: none;
+      padding: 0.7em 2em;
+      margin-right: 1em;
+      font-size: 1em;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+    .tab-btn.active, .tab-btn:hover {
+      background: #333;
+      color: #fff;
+    }
+    .sidebar {
+      position: fixed;
+      left: 0; top: 56px; bottom: 0;
+      width: 300px;
+      background: #181818;
+      border-right: 1px solid #444;
+      padding: 1em;
+      overflow-y: auto;
+    }
+    .tree-container {
+      margin-left: 320px;
+      margin-top: 56px;
+      padding: 2em;
+      padding-bottom: 250px; /* Add enough space for the footer */
+    }
+    .symbol-list { list-style: none; padding: 0; }
+    .symbol-list li { margin-bottom: 0.5em; }
+    .symbol { color: #8cf; }
+    .address { color: #fc8; }
+    .tree { }
     .node {
       border: 1px solid #888;
       border-radius: 8px;
@@ -26,48 +73,76 @@
     .comm { color: #fc8; }
     .state { color: #8f8; }
     .label { color: #aaa; }
+    #footer {
+      background: #181818;
+      color: #eee;
+      padding: 1em;
+      border-top: 1px solid #444;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 220px; /* Set your desired fixed height */
+      overflow: hidden;
+      z-index: 10;
+    }
+    #registers {
+      max-height: 150px; /* Adjust as needed */
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
-  <h2>Process Tree</h2>
-  <div id="tree" class="tree"></div>
+  <div class="navbar">
+    <button class="tab-btn" id="tab-process" onclick="showTab('process')">Process</button>
+    <button class="tab-btn" id="tab-memory" onclick="showTab('memory')">Memory Usage</button>
+  </div>
+  <div class="sidebar">
+    <h3>OphthalmosMono</h3>
+    <hr>
+    <div id="symbols-section">
+      <h4>Symbols</h4>
+      <ul id="symbols" class="symbol-list"></ul>
+    </div>
+  </div>
+  <div class="tree-container">
+    <div id="tab-content-process" class="tab-content active">
+      <h2>Process Tree</h2>
+      <div id="tree" class="tree"></div>
+      <h2>All Kernel Tasks</h2>
+      <div id="all-tasks"></div>
+    </div>
+    <div id="tab-content-memory" class="tab-content" style="display:none;">
+      <h2>Memory Usage</h2>
+      <div id="memory-usage"></div>
+    </div>
+  </div>
+  <div id="footer">
+    <h4>Registers</h4>
+    <div id="registers"></div>
+  </div>
   <script>
-    // Example fetch, replace URL if needed
-    async function fetchInitTask() {
-      const resp = await fetch('http://localhost:8000/');
+    async function fetchSymbols() {
+      const resp = await fetch('http://localhost:8000/symbols');
       return await resp.json();
     }
 
-    // Dummy data for demonstration (replace with fetchInitTask() in production)
-    const demoData = {
-      pid: 0,
-      comm: "swapper/0",
-      __state: 0,
-      saved_state: 0,
-      flags: 0,
-      prio: 0,
-      on_cpu: 0,
-      exit_state: 0,
-      children: [
-        {
-          pid: 1,
-          comm: "init",
-          __state: 1,
-          children: [
-            {
-              pid: 96,
-              comm: "udhcpc",
-              __state: 1,
-              children: [
-                { pid: 105, comm: "sumtion", __state: 0, children: [] }
-              ]
-            }
-          ]
-        }
-      ]
-    };
+    async function renderSymbols() {
+      const symbols = await fetchSymbols();
+      const ul = document.getElementById('symbols');
+      ul.innerHTML = '';
+      symbols.forEach(s => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="symbol">${s.symbol}</span>: <span class="address">${s.address}</span>`;
+        ul.appendChild(li);
+      });
+    }
 
-    // Render a node and its children recursively
+    async function fetchInitTask() {
+      const resp = await fetch('http://localhost:8000/init_task');
+      return await resp.json();
+    }
+
     function renderNode(node) {
       const div = document.createElement('div');
       div.className = 'node';
@@ -87,14 +162,230 @@
       return div;
     }
 
-    // Main render function
-    async function renderTree() {
-      // const data = await fetchInitTask(); // Uncomment for real data
-      const data = demoData; // Remove for real data
-      document.getElementById('tree').appendChild(renderNode(data));
+    async function fetchProcessTree() {
+      const resp = await fetch('http://localhost:8000/process_tree');
+      return await resp.json();
     }
 
-    renderTree();
+    async function renderTree() {
+      const data = await fetchProcessTree();
+      const treeDiv = document.getElementById('tree');
+      treeDiv.innerHTML = '';
+      treeDiv.appendChild(renderNode(data));
+    }
+
+    async function fetchRegisters() {
+      const resp = await fetch('http://localhost:8000/registers');
+      return await resp.json();
+    }
+
+    function highlightRegister(reg) {
+      return ['rip', 'eip', 'rsp', 'esp', 'rbp', 'ebp', 'pc', 'sp', 'bp'].includes(reg);
+    }
+
+    async function renderRegisters() {
+      const regs = await fetchRegisters();
+      const div = document.getElementById('registers');
+      div.innerHTML = '';
+      if (regs.error) {
+        div.textContent = 'Error: ' + regs.error;
+        return;
+      }
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      Object.entries(regs).forEach(([reg, val]) => {
+        const tr = document.createElement('tr');
+        const tdReg = document.createElement('td');
+        const tdVal = document.createElement('td');
+        tdReg.textContent = reg;
+        tdVal.textContent = val;
+        tdReg.style.padding = tdVal.style.padding = '4px 8px';
+        tdReg.style.color = '#8cf';
+        tdVal.style.color = '#fc8';
+        if (highlightRegister(reg)) {
+          tdReg.style.fontWeight = tdVal.style.fontWeight = 'bold';
+          tdReg.style.background = tdVal.style.background = '#333';
+        }
+        tr.appendChild(tdReg);
+        tr.appendChild(tdVal);
+        table.appendChild(tr);
+      });
+      div.appendChild(table);
+    }
+
+    async function renderInitTask() {
+      const data = await fetchInitTask();
+      const div = document.getElementById('init-task');
+      div.innerHTML = '';
+      if (data.error) {
+        div.textContent = 'Error: ' + data.error;
+        return;
+      }
+      const table = document.createElement('table');
+      table.style.borderCollapse = 'collapse';
+      Object.entries(data).forEach(([key, val]) => {
+        const tr = document.createElement('tr');
+        const tdKey = document.createElement('td');
+        const tdVal = document.createElement('td');
+        tdKey.textContent = key;
+        tdVal.textContent = val;
+        tdKey.style.padding = tdVal.style.padding = '4px 8px';
+        tdKey.style.color = '#8cf';
+        tdVal.style.color = '#fc8';
+        tr.appendChild(tdKey);
+        tr.appendChild(tdVal);
+        table.appendChild(tr);
+      });
+      div.appendChild(table);
+    }
+
+    async function fetchAllTasks() {
+      const resp = await fetch('http://localhost:8000/all_tasks');
+      return await resp.json();
+    }
+
+    async function renderAllTasks() {
+      const tasks = await fetchAllTasks();
+      const div = document.getElementById('all-tasks');
+      div.innerHTML = '';
+      if (tasks.length && tasks[0].error) {
+        div.textContent = 'Error: ' + tasks[0].error;
+        return;
+      }
+      const table = document.createElement('table');
+      table.style.borderCollapse = 'collapse';
+      const header = document.createElement('tr');
+      ['pid', 'comm', '__state', 'prio', 'on_cpu', 'exit_state'].forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        th.style.color = '#8cf';
+        th.style.padding = '4px 8px';
+        header.appendChild(th);
+      });
+      table.appendChild(header);
+      tasks.forEach(task => {
+        const tr = document.createElement('tr');
+        ['pid', 'comm', '__state', 'prio', 'on_cpu', 'exit_state'].forEach(k => {
+          const td = document.createElement('td');
+          td.textContent = task[k];
+          td.style.padding = '4px 8px';
+          td.style.color = k === 'comm' ? '#fc8' : '#eee';
+          tr.appendChild(td);
+        });
+        table.appendChild(tr);
+      });
+      div.appendChild(table);
+    }
+
+    let lastSlubCachesJson = null;
+    async function renderMemoryUsage() {
+      const div = document.getElementById('memory-usage');
+      // Fetch and render SLUB memory info
+      const slub = await fetchSlubMemory();
+      const newCachesJson = JSON.stringify(slub.caches);
+      if (lastSlubCachesJson === newCachesJson) {
+        // No change, do not re-render
+        return;
+      }
+      lastSlubCachesJson = newCachesJson;
+      div.innerHTML = '';
+      // Show all cache info as a table if present
+      if (slub.caches && Array.isArray(slub.caches) && slub.caches.length > 0) {
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+        table.style.background = '#222';
+        table.style.marginTop = '1em';
+        table.style.fontSize = '1em';
+        table.style.tableLayout = 'fixed';
+        table.style.maxHeight = '600px';
+        table.style.overflowY = 'auto';
+        // Table header
+        const header = document.createElement('tr');
+        ['Name', 'Address', 'Object Size', 'In Use (per slab)', 'Size', 'Total Slabs', 'Total Objects'].forEach((h, idx) => {
+          const th = document.createElement('th');
+          th.textContent = h;
+          th.style.color = '#8cf';
+          th.style.padding = '8px 12px';
+          th.style.borderBottom = '2px solid #444';
+          th.style.background = '#181818';
+          th.style.position = 'sticky';
+          th.style.top = '0';
+          th.style.zIndex = '2';
+          if (h === 'Address') th.style.fontFamily = 'monospace';
+          if (['Object Size', 'In Use (per slab)', 'Size', 'Total Slabs', 'Total Objects'].includes(h)) th.style.textAlign = 'right';
+          header.appendChild(th);
+        });
+        table.appendChild(header);
+        // Table rows
+        slub.caches.forEach(cache => {
+          const tr = document.createElement('tr');
+          ['name', 'address', 'object_size', 'inuse', 'size', 'total_slabs', 'total_objects'].forEach(k => {
+            const td = document.createElement('td');
+            td.textContent = cache[k] !== undefined && cache[k] !== null && cache[k] !== '' ? cache[k] : '-';
+            td.style.padding = '6px 12px';
+            td.style.borderBottom = '1px solid #333';
+            if (k === 'name') td.style.color = '#fc8';
+            if (k === 'address') td.style.fontFamily = 'monospace';
+            if (['object_size', 'inuse', 'size', 'total_slabs', 'total_objects'].includes(k)) {
+              td.style.textAlign = 'right';
+              td.style.fontVariantNumeric = 'tabular-nums';
+            }
+            tr.appendChild(td);
+          });
+          table.appendChild(tr);
+        });
+        div.appendChild(table);
+      } else {
+        div.innerHTML = '<span style="color:#f88">No SLUB caches found.</span>';
+      }
+    }
+
+    async function fetchSlubMemory() {
+      const resp = await fetch('http://localhost:8000/slub_memory');
+      return await resp.json();
+    }
+
+    function showTab(tab) {
+      const processTab = document.getElementById('tab-content-process');
+      const memoryTab = document.getElementById('tab-content-memory');
+      const tabProcess = document.getElementById('tab-process');
+      const tabMemory = document.getElementById('tab-memory');
+      if (tab === 'process') {
+        processTab.style.display = 'block';
+        memoryTab.style.display = 'none';
+        tabProcess.classList.add('active');
+        tabMemory.classList.remove('active');
+        renderTree();
+        renderAllTasks();
+      } else {
+        processTab.style.display = 'none';
+        memoryTab.style.display = 'block';
+        tabProcess.classList.remove('active');
+        tabMemory.classList.add('active');
+        renderMemoryUsage(); // Only update when switching to the tab
+      }
+    }
+
+    // Initial tab
+    showTab('process');
+
+    // Live update only process info when process tab is active
+    setInterval(() => {
+      if (document.getElementById('tab-content-process').style.display !== 'none') {
+        renderTree();
+        renderAllTasks();
+        renderRegisters();
+      }
+    }, 1000);
+
+    // Optionally, update memory info when memory tab is active
+    // setInterval(() => {
+    //   if (document.getElementById('tab-content-memory').style.display !== 'none') {
+    //     renderMemoryUsage();
+    //   }
+    // }, 10000); // 10 seconds
   </script>
 </body>
 </html>
