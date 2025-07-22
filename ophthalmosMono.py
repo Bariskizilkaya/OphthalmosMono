@@ -8,6 +8,49 @@ import re
 
 selected_comm = None
 
+
+def print_kmem_cache_names():
+    list_member_name = 'list'
+    head_ptr = gdb.parse_and_eval('slab_caches')
+    list_head_type = gdb.lookup_type('struct list_head').pointer()
+    kmem_cache_ptr_type = gdb.lookup_type('struct kmem_cache').pointer()
+
+    head = head_ptr.cast(list_head_type)
+    start_addr = int(head)
+    current = head
+
+    offset = int(gdb.parse_and_eval(f'(size_t) &(((struct kmem_cache *)0)->{list_member_name})'))
+
+    caches = []
+    while True:
+        kmem_cache_addr = int(current) - offset
+        kmem_cache = gdb.Value(kmem_cache_addr).cast(kmem_cache_ptr_type)
+
+        try:
+            name_ptr = kmem_cache['name']
+            name = name_ptr.string()
+        except Exception:
+            name = "<invalid>"
+
+        caches.append({
+            "address": hex(kmem_cache_addr),
+            "name": name
+        })
+
+        try:
+            current = kmem_cache[list_member_name].address['next']
+        except Exception:
+            print("Failed to get next pointer. Stopping traversal.")
+            break
+
+        if int(current) == start_addr:
+            break
+
+    # Return JSON string with all cache info
+    return json.dumps(caches, indent=2)
+
+
+
 def get_kmem_cache_cpu(kmem_cache, cpu_id=0):
     per_cpu_offset = gdb.lookup_symbol("__per_cpu_offset")[0].value()
     gdb.write(f"per_cpu_offset: {per_cpu_offset}\n")
@@ -147,6 +190,7 @@ def get_all_tasks():
     except Exception as e:
         return [{"error": str(e)}]
 
+
 def get_slub_memory_usage():
     caches = []
     MAX_NUMNODES = 4  # Set to 1, 2, or 4 for most systems
@@ -274,11 +318,12 @@ class InitTaskHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(tasks).encode())
         elif self.path == "/slub_memory":
-            usage = get_slub_memory_usage()
+            # Use print_kmem_cache_names for memory usage
+            result = print_kmem_cache_names()
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(usage).encode())
+            self.wfile.write(result.encode())
         elif self.path == "/all_symbols":
             data = get_all_symbols()
             self.send_response(200)

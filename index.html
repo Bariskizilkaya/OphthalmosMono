@@ -281,71 +281,54 @@
     let lastSlubCachesJson = null;
     async function renderMemoryUsage() {
       const div = document.getElementById('memory-usage');
-      div.innerHTML = '<div id="memory-loading" style="color:#8cf;padding:2em;text-align:center;">Loading memory usage...</div>';
-      // Fetch and render SLUB memory info
-      const slub = await fetchSlubMemory();
-      const newCachesJson = JSON.stringify(slub.caches);
-      if (lastSlubCachesJson === newCachesJson) {
-        // No change, do not re-render
-        return;
-      }
-      lastSlubCachesJson = newCachesJson;
-      div.innerHTML = '';
-      // Show all cache info as a table if present
-      if (slub.caches && Array.isArray(slub.caches) && slub.caches.length > 0) {
+      div.innerHTML = '<div style="color:#8cf;padding:2em;text-align:center;">Loading SLUB caches...</div>';
+      try {
+        const resp = await fetch('http://localhost:8000/slub_memory');
+        const caches = await resp.json();
+        div.innerHTML = '';
+        if (!Array.isArray(caches) || caches.length === 0) {
+          div.innerHTML = '<span style="color:#f88">No SLUB caches found.</span>';
+          return;
+        }
         const table = document.createElement('table');
         table.style.width = '100%';
         table.style.borderCollapse = 'collapse';
         table.style.background = '#222';
         table.style.marginTop = '1em';
         table.style.fontSize = '1em';
-        table.style.tableLayout = 'fixed';
-        table.style.maxHeight = '600px';
-        table.style.overflowY = 'auto';
+
         // Table header
         const header = document.createElement('tr');
-        ['Name', 'Address', 'Object Size', 'In Use (per slab)', 'Size', 'Total Slabs', 'Total Objects'].forEach((h, idx) => {
+        ['Name', 'Address'].forEach(h => {
           const th = document.createElement('th');
           th.textContent = h;
           th.style.color = '#8cf';
           th.style.padding = '8px 12px';
           th.style.borderBottom = '2px solid #444';
           th.style.background = '#181818';
-          th.style.position = 'sticky';
-          th.style.top = '0';
-          th.style.zIndex = '2';
-          if (h === 'Address') th.style.fontFamily = 'monospace';
-          if (['Object Size', 'In Use (per slab)', 'Size', 'Total Slabs', 'Total Objects'].includes(h)) th.style.textAlign = 'right';
           header.appendChild(th);
         });
         table.appendChild(header);
+
         // Table rows
-        slub.caches.forEach(cache => {
+        caches.forEach(cache => {
           const tr = document.createElement('tr');
-          ['name', 'address', 'object_size', 'inuse', 'size', 'total_slabs', 'total_objects'].forEach(k => {
-            const td = document.createElement('td');
-            td.textContent = cache[k] !== undefined && cache[k] !== null && cache[k] !== '' ? cache[k] : '-';
-            td.style.padding = '6px 12px';
-            td.style.borderBottom = '1px solid #333';
-            if (k === 'name') td.style.color = '#fc8';
-            if (k === 'address') td.style.fontFamily = 'monospace';
-            if (['object_size', 'inuse', 'size', 'total_slabs', 'total_objects'].includes(k)) {
-              td.style.textAlign = 'right';
-              td.style.fontVariantNumeric = 'tabular-nums';
-            }
-            tr.appendChild(td);
-          });
+          const tdName = document.createElement('td');
+          const tdAddr = document.createElement('td');
+          tdName.textContent = cache.name;
+          tdAddr.textContent = cache.address;
+          tdName.style.padding = tdAddr.style.padding = '6px 12px';
+          tdName.style.color = '#fc8';
+          tdAddr.style.color = '#8cf';
+          tdAddr.style.fontFamily = 'monospace';
+          tr.appendChild(tdName);
+          tr.appendChild(tdAddr);
           table.appendChild(tr);
         });
         div.appendChild(table);
-      } else {
-        div.innerHTML = '<span style="color:#f88">No SLUB caches found.</span>';
+      } catch (e) {
+        div.innerHTML = `<span style="color:#f88">Error loading SLUB caches: ${e}</span>`;
       }
-    }
-
-    async function fetchSlubMemory() {
-      const resp = await fetch('http://localhost:8000/slub_memory');
-      return await resp.json();
     }
 
     function showTab(tab) {
